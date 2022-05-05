@@ -26,19 +26,21 @@ from training.validate import validate
 from utilis.meters import AverageMeter
 from utilis.saving import save_checkpoint
 
-best_acc1 = 0
+from dataset import MyDataset
+
+best_loss1 = 0
 
 
 def main():
     args = parser.parse_args()
-    if args.concat:
-        args.sum = False
-    if args.dataset == "PACS":
-        args.classes_num = 7
-    elif args.dataset == "VLCS":
-        args.classes_num = 5
-    else:
-        args.classes_num = 20
+    # if args.concat:
+    #     args.sum = False
+    # if args.dataset == "PACS":
+    #     args.classes_num = 7
+    # elif args.dataset == "VLCS":
+    #     args.classes_num = 5
+    # else:
+    #     args.classes_num = 20
 
     args.log_path = os.path.join(args.log_base, args.dataset, "log.txt")
 
@@ -65,7 +67,7 @@ def main():
 
 
 def main_worker(ngpus_per_node, args):
-    global best_acc1
+    global best_loss1
 
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
@@ -78,12 +80,39 @@ def main_worker(ngpus_per_node, args):
     #     dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
     #                             world_size=args.world_size, rank=args.rank)
 
-    if args.pretrained:
-        print("=> using pre-trained model '{}'".format(args.arch))
-        model = models.__dict__[args.arch](pretrained=True, args=args)
+    i = 1
+    trainpath = os.path.join(args.data, 'u%d.base' % i)     # './datasets/ml-100k/u%d.base' % i
+    testpath = os.path.join(args.data, 'u%d.test' % i)      # './datasets/ml-100k/u%d.test' % i
+
+    train_dataset = MyDataset(trainpath)
+    test_dataset = MyDataset(testpath)
+
+    if args.distributed:
+        print("initializing distributed sampler")
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     else:
-        print("=> creating model '{}'".format(args.arch))
-        model = models.__dict__[args.arch](args=args)
+        train_sampler = None
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset, batch_size=args.batch_size, shuffle=False,
+        num_workers=args.workers, pin_memory=True)
+
+
+    print("=> creating model '{}'".format(args.arch))
+    model = models.__dict__[args.arch](train_loader, args=args)
+    print("=> finished creating model '{}'".format(args.arch))
+
+
+    # if args.pretrained:
+    #     print("=> using pre-trained model '{}'".format(args.arch))
+    #     model = models.__dict__[args.arch](pretrained=True, args=args)
+    # else:
+    #     print("=> creating model '{}'".format(args.arch))
+    #     model = models.__dict__[args.arch](args=args)
 
     # print('Freezing cnn parameters')
     # for param in model.parameters():
@@ -92,10 +121,10 @@ def main_worker(ngpus_per_node, args):
     # model.fc1.bias.requires_grad = True
     # print('Done')
 
-    num_ftrs = model.fc1.in_features
-    model.fc1 = nn.Linear(num_ftrs, args.classes_num)
-    nn.init.xavier_uniform_(model.fc1.weight, .1)
-    nn.init.constant_(model.fc1.bias, 0.)
+    # num_ftrs = model.fc1.in_features
+    # model.fc1 = nn.Linear(num_ftrs, args.classes_num)
+    # nn.init.xavier_uniform_(model.fc1.weight, .1)
+    # nn.init.constant_(model.fc1.bias, 0.)
 
     if args.distributed:
         if args.gpu is not None:
@@ -119,8 +148,8 @@ def main_worker(ngpus_per_node, args):
             model = torch.nn.DataParallel(model).cuda()
 
     # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss().cuda(args.gpu)
-    criterion_train = nn.CrossEntropyLoss(reduce=False).cuda(args.gpu)
+    criterion = nn.MSELoss()
+    criterion_train = nn.MSELoss(reduction='none').cuda(args.gpu)
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -148,50 +177,6 @@ def main_worker(ngpus_per_node, args):
 
     cudnn.benchmark = True
 
-    traindir = os.path.join(args.data, 'train')
-    valdir = os.path.join(args.data, 'val')
-    testdir = os.path.join(args.data, 'test')
-
-    train_dataset = datasets.ImageFolder(
-        traindir,
-        transforms.Compose([
-            transforms.RandomResizedCrop(224, scale=(args.min_scale, 1.0)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ColorJitter(.4, .4, .4, .4),
-            transforms.RandomGrayscale(args.gray_scale),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ]))
-
-    if args.distributed:
-        print("initializing distributed sampler")
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-    else:
-        train_sampler = None
-
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
-
-    val_loader = torch.utils.data.DataLoader(
-        datasets.ImageFolder(valdir, transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-        ])),
-        batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
-    test_loader = torch.utils.data.DataLoader(
-        datasets.ImageFolder(testdir, transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-        ])),
-        batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
-
     log_dir = os.path.dirname(args.log_path)
     print('tensorboard dir {}'.format(log_dir))
     tensor_writer = SummaryWriter(log_dir)
@@ -207,11 +192,12 @@ def main_worker(ngpus_per_node, args):
 
         train(train_loader, model, criterion_train, optimizer, epoch, args, tensor_writer)
 
-        val_acc1 = validate(val_loader, model, criterion, epoch, False, args, tensor_writer)
-        acc1 = validate(test_loader, model, criterion, epoch, True, args, tensor_writer)
+        # val_acc1 = validate(val_loader, model, criterion, epoch, False, args, tensor_writer)
+        loss1 = validate(test_loader, model, criterion, epoch, True, args, tensor_writer)
 
-        is_best = acc1 > best_acc1
-        best_acc1 = max(acc1, best_acc1)
+        # is_best = acc1 > best_acc1
+        is_best = loss1 < best_loss1
+        best_loss1 = min(loss1, best_loss1)
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                                                     and args.rank % ngpus_per_node == 0):

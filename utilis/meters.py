@@ -32,7 +32,7 @@ class ProgressMeter(object):
     def display(self, batch, name):
         entries = [self.prefix + self.batch_fmtstr.format(batch)]
         entries += [str(meter) for meter in self.meters]
-        print('method name {}'.format(name))
+        # print('method name {}'.format(name))
         print('\t'.join(entries))
 
     def write_log(self, batch, log_path):

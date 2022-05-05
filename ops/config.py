@@ -8,21 +8,21 @@ model_names = sorted(name for name in models.__dict__
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 
-parser.add_argument('-data', metavar='DIR', default='/DATA/DATANAS1/windxrz/dataset/PACS/split_compositional_with_val_sketch',
+parser.add_argument('-data', metavar='DIR', default='./datasets/ml-100k',
                     help='path to dataset')
 
-parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18_with_table',
+parser.add_argument('-a', '--arch', metavar='ARCH', default='SVD',
                     choices=model_names,
                     help='model architecture: ' +
                         ' | '.join(model_names) +
-                        ' (default: resnet18)')
+                        ' (default: SVD)')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=30, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=128, type=int,
+parser.add_argument('-b', '--batch-size', default=100, type=int,                                        # 128
                     metavar='N',
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
@@ -79,8 +79,8 @@ parser.add_argument ('--lambdapre', type = float, default = 1, help = 'weight fo
 parser.add_argument ('--epochb', type = int, default = 20, help = 'number of epochs to balance')
 parser.add_argument ('--epochp', type = int, default = 0, help = 'number of epochs to pretrain')
 
-parser.add_argument ('--n_feature', type=int, default=128, help = 'number of pre-saved features')
-parser.add_argument ('--feature_dim', type=int, default=512, help = 'the dim of each feature')
+parser.add_argument ('--n_feature', type=int, default=100, help = 'number of pre-saved features')       # 128
+parser.add_argument ('--feature_dim', type=int, default=200, help = 'the dim of each feature')          # 512
 
 parser.add_argument ('--lrwarmup_epo', type=int, default=0, help = 'the dim of each feature')
 parser.add_argument ('--lrwarmup_decay', type=int, default=0.1, help = 'the dim of each feature')
@@ -115,9 +115,9 @@ parser.add_argument ('--lower_scale', type=float, default=0.8, help = 'weight la
 # for lr decay epochs
 parser.add_argument ('--epochs_decay', type=list, default=[24, 30], help = 'weight lambda for second order moment loss')
 
-parser.add_argument ('--classes_num', type=int, default=5, help = 'number of epoch for lambda to decay')
+# parser.add_argument ('--classes_num', type=int, default=5, help = 'number of class')
 
-parser.add_argument ('--dataset', type=str, default="PACS", help = '')
+parser.add_argument ('--dataset', type=str, default="ml-100k", help = '')
 parser.add_argument ('--sub_dataset', type=str, default="", help = '')
 parser.add_argument ('--gray_scale', type=float, default=0.1, help = 'weight lambda for second order moment loss')
 
