@@ -33,16 +33,8 @@ best_loss1 = 0
 
 def main():
     args = parser.parse_args()
-    # if args.concat:
-    #     args.sum = False
-    # if args.dataset == "PACS":
-    #     args.classes_num = 7
-    # elif args.dataset == "VLCS":
-    #     args.classes_num = 5
-    # else:
-    #     args.classes_num = 20
 
-    args.log_path = os.path.join(args.log_base, args.dataset, "log.txt")
+    args.log_path = os.path.join(args.log_base, args.dataset, args.arch, 'mae_' + str(args.cv) +'_log.txt')
 
     if not os.path.exists(os.path.dirname(args.log_path)):
         os.makedirs(os.path.dirname(args.log_path))
@@ -54,8 +46,7 @@ def main():
         cudnn.deterministic = True
 
     if args.gpu is not None:
-        warnings.warn('You have chosen a specific GPU. This will completely '
-                      'disable data parallelism.')
+        warnings.warn('You have chosen a specific GPU. This will completely disable data parallelism.')
 
     if args.dist_url == "env://" and args.world_size == -1:
         args.world_size = int(os.environ["WORLD_SIZE"])
@@ -72,20 +63,16 @@ def main_worker(ngpus_per_node, args):
     if args.gpu is not None:
         print("Use GPU: {} for training".format(args.gpu))
 
-    # if args.distributed:
-    #     if args.dist_url == "env://" and args.rank == -1:
-    #         args.rank = int(os.environ["RANK"])
-    #     if args.multiprocessing_distributed:
-    #         args.rank = args.rank * ngpus_per_node + gpu
-    #     dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
-    #                             world_size=args.world_size, rank=args.rank)
+    cv = args.cv
+    trainpath = os.path.join(args.datapath, 'u%d.base' % cv)
+    testpath = os.path.join(args.datapath, 'u%d.test' % cv)
 
-    i = 1
-    trainpath = os.path.join(args.data, 'u%d.base' % i)     # './datasets/ml-100k/u%d.base' % i
-    testpath = os.path.join(args.data, 'u%d.test' % i)      # './datasets/ml-100k/u%d.test' % i
-
-    train_dataset = MyDataset(trainpath)
-    test_dataset = MyDataset(testpath)
+    if args.dataset == 'DoubanMusic':
+        train_dataset = MyDataset(trainpath)
+        test_dataset = MyDataset(testpath)
+    elif args.dataset == 'ml-100k':
+        train_dataset = MyDataset(trainpath, timestamp=True)
+        test_dataset = MyDataset(testpath, timestamp=True)
 
     if args.distributed:
         print("initializing distributed sampler")
@@ -103,28 +90,8 @@ def main_worker(ngpus_per_node, args):
 
 
     print("=> creating model '{}'".format(args.arch))
-    model = models.__dict__[args.arch](train_loader, args=args)
+    model = models.__dict__[args.arch](train_loader, args=args, biased=args.biased)
     print("=> finished creating model '{}'".format(args.arch))
-
-
-    # if args.pretrained:
-    #     print("=> using pre-trained model '{}'".format(args.arch))
-    #     model = models.__dict__[args.arch](pretrained=True, args=args)
-    # else:
-    #     print("=> creating model '{}'".format(args.arch))
-    #     model = models.__dict__[args.arch](args=args)
-
-    # print('Freezing cnn parameters')
-    # for param in model.parameters():
-    #     param.requires_grad = False
-    # model.fc1.weight.requires_grad = True
-    # model.fc1.bias.requires_grad = True
-    # print('Done')
-
-    # num_ftrs = model.fc1.in_features
-    # model.fc1 = nn.Linear(num_ftrs, args.classes_num)
-    # nn.init.xavier_uniform_(model.fc1.weight, .1)
-    # nn.init.constant_(model.fc1.bias, 0.)
 
     if args.distributed:
         if args.gpu is not None:
@@ -148,8 +115,8 @@ def main_worker(ngpus_per_node, args):
             model = torch.nn.DataParallel(model).cuda()
 
     # define loss function (criterion) and optimizer
-    criterion = nn.MSELoss()
-    criterion_train = nn.MSELoss(reduction='none').cuda(args.gpu)
+    criterion = nn.L1Loss()
+    criterion_train = nn.L1Loss(reduction='none').cuda(args.gpu)
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -185,6 +152,8 @@ def main_worker(ngpus_per_node, args):
         validate(test_loader, model, criterion, 0, True, args, tensor_writer)
         return
 
+    front_loss = validate(test_loader, model, criterion, -1, True, args, tensor_writer)
+    early_stop = 0
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
@@ -192,10 +161,18 @@ def main_worker(ngpus_per_node, args):
 
         train(train_loader, model, criterion_train, optimizer, epoch, args, tensor_writer)
 
-        # val_acc1 = validate(val_loader, model, criterion, epoch, False, args, tensor_writer)
         loss1 = validate(test_loader, model, criterion, epoch, True, args, tensor_writer)
 
-        # is_best = acc1 > best_acc1
+        if loss1 > front_loss:
+            early_stop = early_stop + 1
+        else:
+            early_stop = 0
+
+        if early_stop == args.early_stop:
+            break
+        else:
+            front_loss = loss1
+
         is_best = loss1 < best_loss1
         best_loss1 = min(loss1, best_loss1)
 

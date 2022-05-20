@@ -21,6 +21,9 @@ def weight_learner(cfeatures, pre_features, pre_weight1, args, global_epoch=0, i
         optimizerbl.zero_grad()
 
         lossb = loss_expect.lossb_expect(all_feature, softmax(all_weight), args.num_f, args.sum)
+        # lossb1 = loss_expect.lossb_expect(all_feature, softmax(all_weight), args.num_f, args.sum)
+        # lossb2 = loss_expect.lossb_expect(all_feature, softmax(all_weight), args.num_f, args.sum)
+        # lossb = lossb1 + lossb2
         lossp = softmax(weight).pow(args.decay_pow).sum()
         lambdap = args.lambdap * max((args.lambda_decay_rate ** (global_epoch // args.lambda_decay_epoch)),
                                      args.min_lambda_times)

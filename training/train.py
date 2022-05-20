@@ -29,18 +29,19 @@ def train(train_loader, model, criterion, optimizer, epoch, args, tensor_writer=
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
-    # top1 = AverageMeter('Acc@1', ':6.2f')
-    # top5 = AverageMeter('Acc@5', ':6.2f')
 
     progress = ProgressMeter(
         len(train_loader),
-        [batch_time, data_time, losses],    # [batch_time, data_time, losses, top1, top5],
+        [batch_time, data_time, losses],
         prefix="Epoch: [{}]".format(epoch))
 
     model.train()
 
     end = time.time()
     for i, (user_item, target) in enumerate(train_loader):
+        if target.shape[0] != train_loader.batch_size:
+            break
+
         data_time.update(time.time() - end)
 
         if args.gpu is not None:
@@ -57,14 +58,12 @@ def train(train_loader, model, criterion, optimizer, epoch, args, tensor_writer=
         else:
             weight1 = Variable(torch.ones(cfeatures.size()[0], 1).cuda())       # cfeatures.size()[0] maybe the batch size
 
+        weight1 = weight1 * train_loader.batch_size
         model.pre_features.data.copy_(pre_features)
         model.pre_weight1.data.copy_(pre_weight1)
 
         loss = criterion(output, target).view(1, -1).mm(weight1).view(1)
-        # acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        losses.update(loss.item(), user_item.size(0))       # size(0) is the batch size
-        # top1.update(acc1[0], user_item.size(0))     
-        # top5.update(acc5[0], user_item.size(0))
+        losses.update(loss.item(), user_item.size(0))                           # size(0) is the batch size
 
         optimizer.zero_grad()
         loss.backward()
@@ -79,5 +78,3 @@ def train(train_loader, model, criterion, optimizer, epoch, args, tensor_writer=
             progress.write_log(i, args.log_path)
 
     tensor_writer.add_scalar('loss/train', losses.avg, epoch)
-    # tensor_writer.add_scalar('ACC@1/train', top1.avg, epoch)
-    # tensor_writer.add_scalar('ACC@5/train', top5.avg, epoch)

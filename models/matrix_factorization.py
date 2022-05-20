@@ -14,19 +14,18 @@ class SVD(nn.Module):
 
         self.rating_scale = rating_scale
 
-        self.n_factors = n_factors
+        self.n_factors = args.n_factors
         self.biased = biased
         self.init_mean = init_mean
         self.init_std_dev = init_std_dev
 
         self.n_feature = args.n_feature
-        self.feature_dim = args.feature_dim
-        self.gpu = args.gpu
-
-        # for tables
-        # for different levels
-        self.register_buffer('pre_features', torch.zeros(self.n_feature, self.feature_dim))
+        self.gpu = args.gpu        
+        
+        self.register_buffer('pre_features', torch.zeros(self.n_feature, 2 * self.n_factors))
         self.register_buffer('pre_weight1', torch.ones(self.n_feature, 1))
+
+        # for different levels
         # if args.n_levels > 1:
         #     self.register_buffer('pre_features_2', torch.zeros(args.n_feature, args.feature_dim))
         #     self.register_buffer('pre_weight1_2', torch.ones(args.n_feature, 1))
@@ -44,7 +43,7 @@ class SVD(nn.Module):
         self.n_items = len(self.ir)      # number of items
         
         if pretrained:
-            pu, qi, bu, bi = self.pretrain()
+            pu, qi, bu, bi = self.pretrain(verbose=False)
             self.pu = nn.Parameter(pu)
             self.qi = nn.Parameter(qi)       
             self.bu = nn.Parameter(bu)
@@ -96,32 +95,49 @@ class SVD(nn.Module):
 
     def forward(self, user_item, clip=True):
         batch_size = user_item.size()[0]
-        flatten_features = torch.zeros(self.n_feature, self.feature_dim)
         predict = self.global_mean * torch.ones(batch_size)
+        flatten_features = torch.zeros(self.n_feature, 2 * self.n_factors)   
         if self.gpu is not None:
             flatten_features = flatten_features.cuda(self.gpu, non_blocking=True)
             predict = predict.cuda(self.gpu, non_blocking=True)
 
-        for i in range(0, batch_size):
-        #for ruid, riid in user_item:
-            ruid = int(user_item[i][0])
-            riid = int(user_item[i][1])
-            try:
-                iuid = self.raw2inner_id_users[ruid]
-            except KeyError:
-                iuid = None
-            try:
-                iiid = self.raw2inner_id_items[riid]
-            except KeyError:
-                iiid = None
-            if iuid and iiid:
-                pu = self.pu[iuid]
-                qi = self.qi[iiid]
-                flatten_features[i] = torch.cat((pu, qi))
-                predict[i] = torch.sum(torch.mul(pu, qi))
-
-        # flatten_features = torch.cat((pu, qi), dim=1)                  # each row is a flatten_feature
-        # predict = torch.sum(torch.mul(pu, qi), dim=1)
+        if self.biased:
+            for i in range(0, batch_size):
+                ruid = int(user_item[i][0])
+                riid = int(user_item[i][1])
+                try:
+                    iuid = self.raw2inner_id_users[ruid]
+                    predict[i] = predict [i] + self.bu[iuid]
+                except KeyError:
+                    iuid = None
+                try:
+                    iiid = self.raw2inner_id_items[riid]
+                    predict[i] = predict [i] + self.bi[iiid]
+                except KeyError:
+                    iiid = None
+                if iuid and iiid:
+                    pu = self.pu[iuid]
+                    qi = self.qi[iiid]
+                    flatten_features[i] = torch.cat((pu, qi))
+                    predict[i] = predict[i] + torch.sum(torch.mul(pu, qi))
+        else:
+            for i in range(0, batch_size):
+                ruid = int(user_item[i][0])
+                riid = int(user_item[i][1])
+                try:
+                    iuid = self.raw2inner_id_users[ruid]
+                except KeyError:
+                    iuid = None
+                try:
+                    iiid = self.raw2inner_id_items[riid]
+                except KeyError:
+                    iiid = None
+                if iuid and iiid:
+                    pu = self.pu[iuid]
+                    qi = self.qi[iiid]
+                    flatten_features[i] = torch.cat((pu, qi))
+                    # flatten_features[i] = qi
+                    predict[i] = torch.sum(torch.mul(pu, qi))
 
         # clip estimate into [lower_bound, higher_bound]
         if clip:
@@ -131,9 +147,11 @@ class SVD(nn.Module):
         return predict, flatten_features   # output.shape is torch.Size([pairs])
 
     def pretrain(self, n_epochs=20, verbose=True,
-                 lr_all=.005, reg_all=.02, lr_bu=None, lr_bi=None, lr_pu=None, lr_qi=None,
-                 reg_bu=None, reg_bi=None, reg_pu=None, reg_qi=None):
-        pu, qi, bu, bi = pretrain_SVD(self)
+                 lr_all=.005, lr_bu=None, lr_bi=None, lr_pu=None, lr_qi=None,
+                 reg_all=.02, reg_bu=None, reg_bi=None, reg_pu=None, reg_qi=None):
+        pu, qi, bu, bi = pretrain_SVD(self, n_epochs=n_epochs, verbose=verbose,
+                                      lr_all=lr_all, lr_bu=lr_bu, lr_bi=lr_bi, lr_pu=lr_pu, lr_qi=lr_qi,
+                                      reg_all=reg_all, reg_bu=reg_bu, reg_bi=reg_bi, reg_pu=reg_pu, reg_qi=reg_qi)
         pu = torch.from_numpy(pu).to(torch.float32)
         qi = torch.from_numpy(qi).to(torch.float32)
         bu = torch.from_numpy(bu).to(torch.float32)
