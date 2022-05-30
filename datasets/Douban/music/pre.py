@@ -5,8 +5,6 @@ data_pd = data_pd.drop_duplicates(subset=['UserId','ItemId'],ignore_index=True)
 data_pd.groupby('Rating').agg({'ItemId':'count'})
 
 data_pd=data_pd[data_pd.Rating!=-1]
-data_pd.to_csv('DoubanMusic.csv',index=False,sep='\t')
-
 
 def filter_g_k_one(data,k=10,u_name='user_id',i_name='business_id',y_name='stars'):
     item_group = data.groupby(i_name).agg({y_name:'count'})
@@ -34,3 +32,5 @@ data = filter_tot(data_pd,k=10,u_name='UserId',i_name='ItemId',y_name='Rating')
 data.shape
 data['UserId'].unique().shape
 data['ItemId'].unique().shape
+
+data.to_csv('DoubanMusic.csv',index=False,sep='\t')
