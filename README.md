@@ -7,10 +7,10 @@
 
 ## Quick Start
 ```bash
-python main_stablenet.py --gpu 0
+python main.py --gpu 0
 ```
 You can see more options from
 ```bash
-python main_stablenet.py -h
+python main.py -h
 ```
 Result files will be saved in `results/`.
