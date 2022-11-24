@@ -11,7 +11,7 @@ import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
 from torch.autograd import Variable
-from utilis.matrix import accuracy
+from utilis.metrics import accuracy
 from utilis.meters import AverageMeter, ProgressMeter
 
 from training.reweighting import weight_learner
