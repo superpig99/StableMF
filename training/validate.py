@@ -6,7 +6,7 @@ import torch.nn.parallel
 import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
-from utilis.matrix import accuracy
+from utilis.metrics import accuracy
 from utilis.meters import AverageMeter, ProgressMeter
 
 
