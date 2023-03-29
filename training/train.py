@@ -52,6 +52,10 @@ def train(train_loader, model, criterion, optimizer, epoch, args, tensor_writer=
         pre_features = model.pre_features
         pre_weight1 = model.pre_weight1
 
+        print('\nLine 55 of train.py:')
+        print('input shape:\n', '\tuser_item.size:',user_item.size(), '\ttarget.size:',target.size())
+        print('\tcfeatures.size:',cfeatures.size(), '\tpre_features.size:',pre_features.size(), '\tpre_weight1.size:',pre_weight1.size())
+
         if epoch >= args.epochp:
             weight1, pre_features, pre_weight1 = weight_learner(cfeatures, pre_features, pre_weight1, args, epoch, i)
 

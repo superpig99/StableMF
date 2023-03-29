@@ -28,18 +28,20 @@ def normalize(x):
 
 
 def random_fourier_features_gpu(x, w=None, b=None, num_f=None, sum=True, sigma=None, seed=None):
+    print('\nLine 31 of loss_reweighting.py:')
+    print('\tx.size:', x.size())
     if num_f is None:
         num_f = 1
     n = x.size(0)
     r = x.size(1)
-    x = x.view(n, r, 1)
+    x = x.view(n, r, 1) # tf.expend_dims(x, axis=2)
     c = x.size(2)
     if sigma is None or sigma == 0:
         sigma = 1
     if w is None:
         w = 1 / sigma * (torch.randn(size=(num_f, c)))
         b = 2 * np.pi * torch.rand(size=(r, num_f))
-        b = b.repeat((n, 1, 1))
+        b = b.repeat((n, 1, 1)) # tf.tile(tf.expand_dims(b, axis=0), [n,1,1])
 
     Z = torch.sqrt(torch.tensor(2.0 / num_f).cuda())
 
@@ -49,11 +51,19 @@ def random_fourier_features_gpu(x, w=None, b=None, num_f=None, sum=True, sigma=N
     mid -= mid.min(dim=1, keepdim=True)[0]
     mid /= mid.max(dim=1, keepdim=True)[0].cuda()
     mid *= np.pi / 2.0
+    
+    print('\nLine 55 of loss_reweighting.py:')
+    print('\tx.size:', x.size(), '\tn:', n, '\tr:', r, '\tc:', c)
+    print('\tw.size:', w.size(), '\tb.size:', b.size(), '\tZ.size:', Z.size(), '\tmid.size:', mid.size())
+
 
     if sum:
         Z = Z * (torch.cos(mid).cuda() + torch.sin(mid).cuda())
     else:
         Z = Z * torch.cat((torch.cos(mid).cuda(), torch.sin(mid).cuda()), dim=-1)
+
+    print('\nLine 65 of loss_reweighting.py:')
+    print('\tZ.size:', Z.size())
 
     return Z
 
@@ -88,6 +98,10 @@ def lossb_expect(cfeaturec, weight, num_f, sum=True):
         cov1 = cov(cfeaturec, weight)
         cov_matrix = cov1 * cov1
         loss += torch.sum(cov_matrix) - torch.trace(cov_matrix)
+
+    print('\nLine 102 of loss_reweighting.py:')
+    print('\tcfeaturecs.size:', cfeaturecs.size(), '\tweight.size:', weight.size(), '\tcfeaturec.size:', cfeaturec.size())
+    print('\tcov1.size:', cov1.size(), '\tcov_matrix.size:', cov_matrix.size())
 
     return loss
 

@@ -9,7 +9,7 @@ model_names = sorted(name for name in models.__dict__
 parser = argparse.ArgumentParser(description='PyTorch Training')
 
 parser.add_argument('--biased', default=True, type=bool, help='FunkSVD or BiasedSVD') 
-parser.add_argument('--cv', default=1, type=int, choice = [1, 2, 3, 4, 5], help='cross validate fold, 1-5 for 5cv') 
+parser.add_argument('--cv', default=1, type=int, help='cross validate fold, 1-5 for 5cv') 
 
 
 parser.add_argument('--datapath', metavar='DIR', default='./datasets/ml-100k',
@@ -40,7 +40,7 @@ parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)',
                     dest='weight_decay')                    
 parser.add_argument ('--lrbl', type = float, default = 1.0, help = 'learning rate of balance')
-parser.add_argument ('--epochb', type = int, default = 20, help = 'number of epochs to balance')
+parser.add_argument ('--epochb', type = int, default = 2, help = 'number of epochs to balance')
 
                     
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
@@ -48,7 +48,7 @@ parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
 
 parser.add_argument('-a', '--arch', metavar='ARCH', default='SVD',
                     help='SVD only')
-parser.add_argument('--epochs', default=20, type=int, metavar='N',
+parser.add_argument('--epochs', default=2, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
