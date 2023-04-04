@@ -52,9 +52,9 @@ def train(train_loader, model, criterion, optimizer, epoch, args, tensor_writer=
         pre_features = model.pre_features
         pre_weight1 = model.pre_weight1
 
-        print('\nLine 55 of train.py:')
-        print('input shape:\n', '\tuser_item.size:',user_item.size(), '\ttarget.size:',target.size())
-        print('\tcfeatures.size:',cfeatures.size(), '\tpre_features.size:',pre_features.size(), '\tpre_weight1.size:',pre_weight1.size())
+        # print('\nLine 55 of train.py:')
+        # print('input shape:\n', '\tuser_item.size:',user_item.size(), '\ttarget.size:',target.size())
+        # print('\tcfeatures.size:',cfeatures.size(), '\tpre_features.size:',pre_features.size(), '\tpre_weight1.size:',pre_weight1.size())
 
         if epoch >= args.epochp:
             weight1, pre_features, pre_weight1 = weight_learner(cfeatures, pre_features, pre_weight1, args, epoch, i)
@@ -68,6 +68,11 @@ def train(train_loader, model, criterion, optimizer, epoch, args, tensor_writer=
 
         loss = criterion(output, target).view(1, -1).mm(weight1).view(1)
         losses.update(loss.item(), user_item.size(0))                           # size(0) is the batch size
+        
+        if (epoch%50 == 0 or epoch == args.epochs-1) and (i%500==0 or i==len(train_loader)-1):
+            print('Epoch:', epoch, ' Batch:', i, '\t weight[:3]:', weight1[:3], \
+                    '\t loss:', torch.sum(criterion(output, target)), \
+                    '\t reweighted loss:', loss)
 
         optimizer.zero_grad()
         loss.backward()

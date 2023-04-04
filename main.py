@@ -147,7 +147,7 @@ def main_worker(ngpus_per_node, args):
     log_dir = os.path.dirname(args.log_path)
     print('tensorboard dir {}'.format(log_dir))
     tensor_writer = SummaryWriter(log_dir)
-
+    
     if args.evaluate:
         validate(test_loader, model, criterion, 0, True, args, tensor_writer)
         return

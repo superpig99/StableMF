@@ -15,8 +15,8 @@ def weight_learner(cfeatures, pre_features, pre_weight1, args, global_epoch=0, i
     all_feature = torch.cat([cfeaturec, pre_features.detach()], dim=0)
     optimizerbl = torch.optim.SGD([weight], lr=args.lrbl, momentum=0.9)
 
-    print('\nLine 18 of reweighting.py:')
-    print('\nweight.size:', weight.size(), '\nall_feature.size:', all_feature.size(), '\nall_weight.size:', torch.cat((weight, pre_weight1.detach()), dim=0).size())
+    # print('\nLine 18 of reweighting.py:')
+    # print('\nweight.size:', weight.size(), '\nall_feature.size:', all_feature.size(), '\nall_weight.size:', torch.cat((weight, pre_weight1.detach()), dim=0).size())
 
     for epoch in range(args.epochb):
         lr_setter(optimizerbl, epoch, args, bl=True)
@@ -33,6 +33,9 @@ def weight_learner(cfeatures, pre_features, pre_weight1, args, global_epoch=0, i
         lossg = lossb / lambdap + lossp
         if global_epoch == 0:
             lossg = lossg * args.first_step_cons
+
+        if (global_epoch%50 == 0 or global_epoch == args.epochs-1) and (iter%500==0) and (epoch%5 == 0 or epoch == args.epochb-1):
+            print('Epoch:',global_epoch, ' Batch:',iter, ' ReEpoch:', epoch, '\t HSIC Loss:',lossg)
 
         lossg.backward(retain_graph=True)
         optimizerbl.step()
